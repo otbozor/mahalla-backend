@@ -1,0 +1,357 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        Role      @default(MODERATOR)
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  refreshTokens   RefreshToken[]
+  appealResponses AppealResponse[]
+
+  @@map("users")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── News ─────────────────────────────────────────────────────────────────────
+
+model NewsCategory {
+  id        String   @id @default(cuid())
+  name      String
+  nameRu    String?
+  slug      String   @unique
+  news      News[]
+  createdAt DateTime @default(now())
+
+  @@map("news_categories")
+}
+
+model News {
+  id          String       @id @default(cuid())
+  title       String
+  titleRu     String?
+  slug        String       @unique
+  content     String
+  contentRu   String?
+  excerpt     String?
+  excerptRu   String?
+  imageUrl    String?
+  status      NewsStatus   @default(DRAFT)
+  isFeatured  Boolean      @default(false)
+  viewCount   Int          @default(0)
+  categoryId  String?
+  category    NewsCategory? @relation(fields: [categoryId], references: [id])
+  publishedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@map("news")
+}
+
+enum NewsStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ─── Events ───────────────────────────────────────────────────────────────────
+
+model EventCategory {
+  id        String   @id @default(cuid())
+  name      String
+  nameRu    String?
+  slug      String   @unique
+  events    Event[]
+  createdAt DateTime @default(now())
+
+  @@map("event_categories")
+}
+
+model Event {
+  id                  String        @id @default(cuid())
+  title               String
+  titleRu             String?
+  description         String
+  descriptionRu       String?
+  location            String?
+  imageUrl            String?
+  startDate           DateTime
+  endDate             DateTime?
+  status              EventStatus   @default(UPCOMING)
+  categoryId          String?
+  category            EventCategory? @relation(fields: [categoryId], references: [id])
+  maxAttendees        Int?
+  isRegistrationOpen  Boolean       @default(false)
+  registrations       EventRegistration[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([status, startDate])
+  @@map("events")
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fullName  String
+  phone     String
+  email     String?
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@map("event_registrations")
+}
+
+// ─── Appeals ──────────────────────────────────────────────────────────────────
+
+model AppealCategory {
+  id        String   @id @default(cuid())
+  name      String
+  nameRu    String?
+  appeals   Appeal[]
+  createdAt DateTime @default(now())
+
+  @@map("appeal_categories")
+}
+
+model Appeal {
+  id          String         @id @default(cuid())
+  ticketNo    String         @unique
+  fullName    String
+  phone       String
+  categoryId  String?
+  category    AppealCategory? @relation(fields: [categoryId], references: [id])
+  message     String
+  status      AppealStatus   @default(PENDING)
+  attachments String[]
+  responses   AppealResponse[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+  @@index([ticketNo])
+  @@map("appeals")
+}
+
+enum AppealStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+model AppealResponse {
+  id        String   @id @default(cuid())
+  appealId  String
+  appeal    Appeal   @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([appealId])
+  @@map("appeal_responses")
+}
+
+// ─── Gallery ──────────────────────────────────────────────────────────────────
+
+model GalleryAlbum {
+  id          String        @id @default(cuid())
+  title       String
+  titleRu     String?
+  description String?
+  coverUrl    String?
+  items       GalleryItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("gallery_albums")
+}
+
+model GalleryItem {
+  id         String        @id @default(cuid())
+  albumId    String?
+  album      GalleryAlbum? @relation(fields: [albumId], references: [id])
+  type       MediaType     @default(IMAGE)
+  url        String
+  thumbUrl   String?
+  caption    String?
+  captionRu  String?
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+
+  @@index([albumId])
+  @@map("gallery_items")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// ─── FAQ ──────────────────────────────────────────────────────────────────────
+
+model FAQCategory {
+  id        String   @id @default(cuid())
+  name      String
+  nameRu    String?
+  faqs      FAQ[]
+  createdAt DateTime @default(now())
+
+  @@map("faq_categories")
+}
+
+model FAQ {
+  id          String       @id @default(cuid())
+  question    String
+  questionRu  String?
+  answer      String
+  answerRu    String?
+  categoryId  String?
+  category    FAQCategory? @relation(fields: [categoryId], references: [id])
+  sortOrder   Int          @default(0)
+  isPublished Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@map("faqs")
+}
+
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+model Service {
+  id            String      @id @default(cuid())
+  title         String
+  titleRu       String?
+  description   String?
+  descriptionRu String?
+  url           String?
+  phone         String?
+  type          ServiceType
+  icon          String?
+  imageUrl      String?
+  lat           Float?
+  lon           Float?
+  address       String?
+  addressRu     String?
+  hours         String?
+  hoursRu       String?
+  isActive      Boolean     @default(true)
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([type, isActive])
+  @@map("services")
+}
+
+enum ServiceType {
+  GOVERNMENT
+  COMMUNITY
+  UTILITY
+  EMERGENCY
+}
+
+// ─── Contact ──────────────────────────────────────────────────────────────────
+
+model ContactInfo {
+  id             String   @id @default(cuid())
+  address        String   @default("")
+  addressRu      String   @default("")
+  email          String   @default("")
+  phone          String   @default("")
+  workingHours   String   @default("")
+  workingHoursRu String   @default("")
+  updatedAt      DateTime @updatedAt
+
+  @@map("contact_info")
+}
+
+// ─── About ────────────────────────────────────────────────────────────────────
+
+model Leader {
+  id        String   @id @default(cuid())
+  name      String
+  nameRu    String?
+  role      String
+  roleRu    String?
+  phone     String?
+  bio       String?
+  bioRu     String?
+  imageUrl  String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("leaders")
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  text      String
+  textRu    String?
+  year      Int?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("achievements")
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+
+model CommunityStats {
+  id             String   @id @default(cuid())
+  residents      Int      @default(0)
+  households     Int      @default(0)
+  activeServices Int      @default(0)
+  yearlyEvents   Int      @default(0)
+  streets        Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@map("community_stats")
+}
